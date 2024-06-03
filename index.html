@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Mare Ball</title>
+    <meta content="Mare ball" property="og:title" />
+    <meta content="What if you go to Equestria and all the mares are balls and are bouncy?" property="og:description" />
+    <meta content="#43B581" data-react-helmet="true" name="theme-color" />
+    <style>
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #00000078;    
+            filter: blur(0.5px);
+        }
+
+        #container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .container {
+            align-items: center;
+            text-align: center;
+        }
+
+        body {
+            /*background-image: url("https://i.kym-cdn.com/photos/images/original/000/581/296/c09.jpg");*/
+            background-color:blanchedalmond;
+        }
+    </style>
+</head>
+
+<body>
+    <h1> MARE BALL </h1>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div id="container">
+        <div id="uploadContainer" class="container">
+            <p> Mare uploader: </p>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        <div id="sizeContainer" class="container">
+            <p> Mare size: </p>
+            <input type="range" id="radiusSlider" min="10" max="100" value="20">
+        </div>
+        <div id="crazyMare" class="container">
+            <p> Click to activate Crazy Mare Mode </p>
+            <input type="checkbox" id="crazyMare">
+        </div>
+    </div>
+
+    <script>
+        let isSpacebarDown = false;
+        let crazyMare = false;
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Initial conditions
+        let x = canvas.width / 2;
+        let y = canvas.height / 2;
+        let vx = 5;
+        let vy = 5;
+        const gravity = 0.5;
+        let radius = 20;
+
+        // variables
+        let vel = 20;
+        const dampingFactorX = 0.7;
+        const dampingFactorY = 0.5;
+        let angle = 0;
+        let rotVx = 0;
+        let rotVy = 0;
+        let brakeStrength = 0.1;
+
+        // Load image
+        const img = new Image();
+        img.src = 'fs.jpg'; // Initial image
+
+        function drawBall() {
+            ctx.filter = 'blur(0.5px)';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.closePath();
+            ctx.clip();
+            ctx.translate(x, y);
+            ctx.rotate(angle); // in radian
+            ctx.drawImage(img, -radius, -radius, radius * 2, radius * 2); // Draw the image
+            ctx.restore();
+        }
+
+        function getMousePos(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function update() {
+            x += vx;
+            y += vy;
+
+            if (isSpacebarDown) // Apply brake
+            {
+                vx = vx * (1 - brakeStrength);
+                if (vy < 0)
+                    vy = vy * (1 - brakeStrength);
+            }
+
+            // Gravitational acceleration only when there's potential
+            if (y < canvas.height - radius)
+                vy += gravity;
+
+            vx *= 0.995; // Air drag
+
+
+            // radial velocity
+            if (y >= canvas.height - radius || y <= radius) // if collide
+            {
+                if (vx == 0)
+                    rotVy = 0;
+                else
+                    rotVy = vy / radius * ((vx > 0) ? 1 : -1);
+                angle += vx / radius;
+            }
+
+            angle += rotVy * 0.5;
+
+            if (x >= canvas.width - radius || x <= radius) // if collide
+            {
+                angle += vx / radius;
+            }
+
+            // More collision detection
+
+            if (x + radius > canvas.width || x - radius < 0) {
+                vx *= -dampingFactorX;
+                x = (x + radius > canvas.width) ? canvas.width - radius : radius;
+            }
+            // stopping vx sim when meeting threshold
+            if (Math.abs(vx) < 0.05)
+                vx = 0;
+
+            if (y + radius > canvas.height || y - radius < 0) {
+                vy *= -dampingFactorY;
+                y = (y + radius > canvas.height) ? canvas.height - radius : radius;
+                // stopping vy sim when meeting threshold
+                if (Math.abs(vy) < 0.5)
+                    vy = 0;
+            }
+        }
+
+        function randomizeV() {
+            vx += Math.random() * 100 * (Math.random() < 0.5 ? 1 : -1);
+            vy += Math.random() * 100 * (Math.random() < 0.5 ? 1 : -1);
+        }
+
+        // Helper function to normalize a vector
+        function normalizeVector(x, y) {
+            const magnitude = Math.sqrt(x * x + y * y);
+            return {
+                x: x / magnitude,
+                y: y / magnitude
+            };
+        }
+
+        // Function to calculate the fling direction and velocity
+        function flingToDir(vel, e) {
+            const mousePos = getMousePos(canvas, e);
+            const vecx = mousePos.x - x;
+            const vecy = mousePos.y - y;
+
+            const normalizedVector = normalizeVector(vecx, vecy);
+
+            vx += vel * normalizedVector.x ** 2 * ((vecx > 0) ? 1 : -1)
+            vy += vel * normalizedVector.y ** 2 * ((vecy > 0) ? 1 : -1)
+        }
+
+        // Interactivity
+
+        canvas.addEventListener('mousedown', (e) => {
+            flingToDir(vel, e);
+        });
+
+        document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            isSpacebarDown = true;
+        }
+        });
+
+        document.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            isSpacebarDown = false;
+        }
+        });
+
+
+        function handleImageChange(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function () {
+                    img.src = reader.result;
+                    img.onload = animate; // Call animate() when the new image is loaded
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleRadiusChange(event) {
+            radius = parseInt(event.target.value);
+        }
+
+        function crazyMareMode(event) {
+            crazyMare = event.target.checked;
+        }
+
+        window.onload = function () {
+            // handles image
+            const imageInput = document.getElementById('imageInput');
+            imageInput.addEventListener('change', handleImageChange);
+
+            // handles radius
+            const radiusSlider = document.getElementById('radiusSlider');
+            radiusSlider.addEventListener('input', handleRadiusChange);
+
+            // handles tickbox
+            const tickBox = document.getElementById('crazyMare');
+            tickBox.addEventListener('change', crazyMareMode);
+            animate(); // Start the animation
+        }
+
+        // Runs
+
+        function animate() {
+            drawBall();
+            update();
+            if (crazyMare) {
+                if (Math.random() < 0.2)
+                    randomizeV();
+            }
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+
+</html>
